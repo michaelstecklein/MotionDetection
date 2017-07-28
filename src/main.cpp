@@ -1,26 +1,12 @@
-#include <stdio.h>
-#include "opencv2/opencv.hpp"
-using namespace cv;
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
+#include "PipelineManager.hpp"
+#include "ThreadManager.hpp"
+using namespace std;
 
-int main(int, char**)
-{
-    VideoCapture cap(0); // open the default camera
-    if(!cap.isOpened())  // check if we succeeded
-        return -1;
-    Mat edges;
-    int count = 0;
-    namedWindow("edges",1);
-    for(;;)
-    {
-        Mat frame;
-	printf("Taking pic #%i\n",count++);
-        cap >> frame; // get a new frame from camera
-        cvtColor(frame, edges, COLOR_BGR2GRAY);
-        GaussianBlur(edges, edges, Size(7,7), 1.5, 1.5);
-        Canny(edges, edges, 0, 30, 3);
-        imshow("edges", edges);
-        waitKey(30);
-    }
-    // the camera will be deinitialized automatically in VideoCapture destructor
-    return 0;
+
+int main(void) {
+	runThreads();
+	printf("done\n");
 }

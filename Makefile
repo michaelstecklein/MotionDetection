@@ -1,6 +1,8 @@
 CXX=g++
-CXXFLAGS=-O2 `pkg-config --cflags --libs opencv` -lpthread -w
+CXXFLAGS=-O2 `pkg-config --cflags --libs opencv` -lpthread -w -std=c++11
 EXE=run.bin
+ANALYTICS_EXE=analytics.bin
+TRAINING_EXE=training.bin
 SRCDIR=src
 BLDDIR=build
 SRCS=$(shell find $(SRCDIR) -name "*.cpp")
@@ -10,12 +12,27 @@ OBJS=$(SRCS:$(SRCDIR)/%.cpp=$(BLDDIR)/%.o)
 
 all: $(EXE)
 
-$(EXE): $(OBJS)
+
+.PHONY: add_macro_analytics
+analytics: add_macro_analytics $(ANALYTICS_EXE)
+
+add_macro_analytics:
+	$(eval CXXFLAGS += -D ANALYTICS)
+
+
+.PHONY: add_macro_training
+training: add_macro_training $(TRAINING_EXE)
+
+add_macro_training:
+	$(eval CXXFLAGS += -D SAVE_ALL_IMAGES)
+
+
+$(EXE) $(ANALYTICS_EXE) $(TRAINING_EXE): $(OBJS)
 	$(CXX) -o $@ $^ $(CXXFLAGS)
 
 $(BLDDIR)/%.o: $(SRCDIR)/%.cpp $(DEPS)
 	@mkdir -p $(@D)
-	$(CXX) -c $(CXXFLAGS) -o $@ $^
+	$(CXX) -c $(CXXFLAGS) -o $@ $<
 
 $(DEPS):
 
