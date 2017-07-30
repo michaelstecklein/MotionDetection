@@ -13,85 +13,156 @@
 #define LPF_DIVISOR			10 // length of squares to break raw image into during lpf
 
 
+static void saveAsFile(const char *fname, Mat *img) { // TODO remove
+	FILE *filp;
+	filp = fopen(fname,"w");
+
+    int nChannels = img->channels();
+    int nRows = img->rows;
+    int nCols = img->cols; // TODO account for channels
+	printf("%s r:%i c:%i chan:%i\n",fname,nRows,nCols,nChannels);
+	for (int i = 0; i < nRows; i++)
+		for (int j = 0; j < nCols; j++)
+			fprintf(filp, "%i\n", img->at<uchar>(i,j));
+
+	fprintf(filp, "-------\n");
+	fclose(filp);
+}
+
+#define BLUE	0
+#define GREEN	1
+#define RED		2
+template <typename T>
+class bgr {
+  public:
+	T b,g,r;
+	bgr (void) : bgr (0,0,0) {}
+	bgr (T _b, T _g, T _r) {
+		b = _b; g = _g; r = _r; }
+};
+
 static void preprocess_lpf(PipelineBuffer *buff) {
     CV_Assert(buff->rawImage.depth() == CV_8U); // accept only char type matrices
-	//CV_Assert(buff->rawImage.isContinuous()); // TODO
     int nChannels = buff->rawImage.channels();
+	CV_Assert(nChannels == 3);
     int nRows = buff->rawImage.rows;
-    int nCols = buff->rawImage.cols * nChannels; // TODO account for channels
+    int nCols = buff->rawImage.cols;
 	int nPixels = nRows*nCols;
+	printf("%s r:%i c:%i chan:%i\n","preprocess_lpf",nRows,nCols,nChannels); // TODO remove
+	double aspectRatio = ((double)nCols) / nRows; // TODO remove
+	printf("aspectRation: %f\n",aspectRatio);
 
 	// construct lpf image
 	int lpfRows = nRows / LPF_DIVISOR;
 	int lpfCols = nCols / LPF_DIVISOR;
 	buff->lpfImage.create(lpfRows, lpfCols, buff->rawImage.type());
 
+	Mat_<Vec3b> raw_vec3b = buff->rawImage;
+	Mat_<Vec3b> lpf_vec3b = buff->lpfImage;
     for(int i_chunk = 0; i_chunk < lpfRows; ++i_chunk) { // for each chunk
         for(int j_chunk = 0; j_chunk < lpfCols; ++j_chunk) {
 			// calculate the average value for that chunk
-			int sum = 0;
+			bgr<int> sum = bgr<int>();
 			for (int i_inner = 0; i_inner < LPF_DIVISOR; ++i_inner) { // for each pixel in the given chunk
 				for (int j_inner = 0; j_inner < LPF_DIVISOR; ++j_inner) {
-					int i_buff = i_chunk*LPF_DIVISOR + i_inner; // calculate global indexes
-					int j_buff = j_chunk*LPF_DIVISOR + j_inner;
-					sum += buff->rawImage.at<uchar>(i_buff,j_buff);
+					int i = i_chunk*LPF_DIVISOR + i_inner; // calculate global indexes
+					int j = j_chunk*LPF_DIVISOR + j_inner;
+					bgr<uchar> pixel = {	raw_vec3b(i,j)[BLUE],
+											raw_vec3b(i,j)[GREEN],
+											raw_vec3b(i,j)[RED]	};
+					printf("bgr: %i %i %i\n",pixel.b,pixel.g,pixel.r); // TODO remove
+					sum.b += pixel.b;
+					sum.g += pixel.g;
+					sum.r += pixel.r;
 				}
 			}
 			const int numPixelsInChunk = LPF_DIVISOR*LPF_DIVISOR;
-			int avg = sum / numPixelsInChunk;
-			buff->lpfImage.at<uchar>(i_chunk,j_chunk) = avg;
+			bgr<int> avg = {	sum.b / numPixelsInChunk,
+									sum.g / numPixelsInChunk,
+									sum.r / numPixelsInChunk	};
+			lpf_vec3b(i_chunk,j_chunk)[BLUE] = avg.b;
+			lpf_vec3b(i_chunk,j_chunk)[GREEN] = avg.g;
+			lpf_vec3b(i_chunk,j_chunk)[RED] = avg.r;
         }
     }
 }
 
-double x_com;
-double y_com;
 static double calculateSpatialVariance(Mat *mat) {
 	/* Weighted two-dimensional variance in x,y directions with pixel color
 	 * as weight. The variance is calculated around the "center of mass" of
 	 * the image.	var = x_var + y_var,  x_var,y_var = E[pixel*(x,y-mean)]	*/
     CV_Assert(mat->depth() == CV_8U); // accept only char type matrices
-	//CV_Assert(mat->isContinuous()); // TODO
     int nChannels = mat->channels();
+	CV_Assert(nChannels == 3);
     int nRows = mat->rows;
-    int nCols = mat->cols * nChannels; // TODO account for channels
+    int nCols = mat->cols; // TODO account for channels
 	int nPixels = nRows*nCols;
+	Mat_<Vec3b> mat_vec3b = *mat;
+	printf("%s r:%i c:%i chan:%i\n","calculateSpatialVariance",nRows,nCols,nChannels); // TODO remove
+	double aspectRatio = ((double)nCols) / nRows;
+	printf("aspectRation: %f\n",aspectRatio);
 
-	// center of mass (mean)
-	// x_com = (m1*x1+m2*x2+...) / (m1+m2+...)
-	double x_numerator = 0;
-	double y_numerator = 0;
-	double pixel_sum = 0; // denominator
+	/* Center of Mass (mean)
+	 * x_com = (m1*x1+m2*x2+...) / (m1+m2+...)
+	 * y_com = (m1*y1+m2*y2+...) / (m1+m2+...)	*/
+	bgr<double> x_numerator = bgr<double>();
+	bgr<double> y_numerator = bgr<double>();
+	bgr<double> pixel_sum = bgr<double>(); // denominator
     for(int i = 0; i < nRows; ++i) {
-        uchar *p = mat->ptr<uchar>(i);
         for(int j = 0; j < nCols; ++j) {
-            uchar pixel = p[j];
-			x_numerator += j*pixel;
-			y_numerator += i*pixel;
-			pixel_sum += pixel;
+			bgr<uchar> pixel = {	mat_vec3b(i,j)[BLUE],
+									mat_vec3b(i,j)[GREEN],
+									mat_vec3b(i,j)[RED]	};
+			x_numerator.b += j * pixel.b;
+			x_numerator.g += j * pixel.g;
+			x_numerator.r += j * pixel.r;
+			y_numerator.b += i * pixel.b;
+			y_numerator.g += i * pixel.g;
+			y_numerator.r += i * pixel.r;
+			pixel_sum.b += pixel.b;
+			pixel_sum.g += pixel.g;
+			pixel_sum.r += pixel.r;
         }
     }
-	x_com = x_numerator / pixel_sum;
-	y_com = y_numerator / pixel_sum;
-	printf("Centers of mass:   x_com: %f   y_com: %f\n", x_com, y_com);
+	bgr<double> x_com = {	x_numerator.b / pixel_sum.b,
+							x_numerator.g / pixel_sum.g,
+							x_numerator.r / pixel_sum.r	};
+	bgr<double> y_com = {	y_numerator.b / pixel_sum.b,
+							y_numerator.g / pixel_sum.g,
+							y_numerator.r / pixel_sum.r	};
+	printf("Centers of mass, blue:   x_com: %f   y_com: %f\n", x_com.b, y_com.b);
 
-	// spatial variance
-	// spat_var = weighted_var_x + weighted_var_y
-	// weighted_var_x = ( m1*(x1-x_com)^2 + m2*(x2-x_com)^2 + ...) / (m1+m2+...)
-	double sum_sqr_x = 0;
-	double sum_sqr_y = 0;
+	/* Spatial Variance
+	 * spat_var = weighted_var_x + weighted_var_y
+	 * weighted_var_x = var_x_channel_b + var_x_channel_g + var_x_channel_r
+	 * var_x_channel_m = ( m1*(x1-x_com)^2 + m2*(x2-x_com)^2 + ...) / (m1+m2+...)	*/
+	bgr<double> sum_sqr_x = bgr<double>();
+	bgr<double> sum_sqr_y = bgr<double>();
     for(int i = 0; i < nRows; ++i) {
-        uchar *p = mat->ptr<uchar>(i);
         for(int j = 0; j < nCols; ++j) {
-            uchar pixel = p[j];
-			sum_sqr_x += pixel*pow(j-x_com, 2);
-			sum_sqr_y += pixel*pow(i-y_com, 2);
+			bgr<uchar> pixel = {	mat_vec3b(i,j)[BLUE],
+									mat_vec3b(i,j)[GREEN],
+									mat_vec3b(i,j)[RED]	};
+			sum_sqr_x.b += pixel.b * pow( j - x_com.b, 2);
+			sum_sqr_x.g += pixel.g * pow( j - x_com.g, 2);
+			sum_sqr_x.r += pixel.r * pow( j - x_com.r, 2);
+			sum_sqr_y.b += pixel.b * pow( i - y_com.b, 2);
+			sum_sqr_y.g += pixel.g * pow( i - y_com.g, 2);
+			sum_sqr_y.r += pixel.r * pow( i - y_com.r, 2);
         }
     }
-	double weighted_var_x = sum_sqr_x / pixel_sum;
-	double weighted_var_y = sum_sqr_y / pixel_sum;
+	bgr<double> weighted_var_x = {	sum_sqr_x.b / pixel_sum.b,
+									sum_sqr_x.g / pixel_sum.g,
+									sum_sqr_x.r / pixel_sum.r	};
+	bgr<double> weighted_var_y = {	sum_sqr_y.b / pixel_sum.b,
+									sum_sqr_y.g / pixel_sum.g,
+									sum_sqr_y.r / pixel_sum.r	};
 
-	return weighted_var_x + weighted_var_y;
+	/* Spatial variance is sum of var_x and var_y, which are sums of the variances
+	 * of the channels b, g, and r.	*/
+	return	weighted_var_x.b + weighted_var_y.b + \
+			weighted_var_x.g + weighted_var_y.g + \
+			weighted_var_x.r + weighted_var_y.r;
 }
 
 static double calculateVariance(Mat *mat) {
@@ -99,55 +170,50 @@ static double calculateVariance(Mat *mat) {
 	 * for channels blue(b), green(g), and red(r).	*/
     CV_Assert(mat->depth() == CV_8U); // accept only char type matrices
     int nChannels = mat->channels();
+	CV_Assert(nChannels == 3);
 	printf("nChannels=%i\n",nChannels);
 	CV_Assert(nChannels==3);
     int nRows = mat->rows;
     int nCols = mat->cols;
 	int nPixels = nRows*nCols;
-    if (mat->isContinuous()) {
-        nCols *= nRows;
-        nRows = 1;
-    }
+	Mat_<Vec3b> mat_vec3b = *mat;
+	printf("%s r:%i c:%i chan:%i\n","calculateVariance",nRows,nCols,nChannels); // TODO remove
+	double aspectRatio = ((double)nCols) / nRows;
+	printf("aspectRation: %f\n",aspectRatio);
 
 	// mean
-	double b_sum = 0; // blue
-	double g_sum = 0; // green
-	double r_sum = 0; // red
+	bgr<double> sum = bgr<double>();
     for(int i = 0; i < nRows; ++i) {
-        uchar *p = mat->ptr<uchar>(i);
         for(int j = 0; j < nCols; ++j) {
-            uchar b_pixel = p[j*nChannels + 0];
-            uchar g_pixel = p[j*nChannels + 1];
-            uchar r_pixel = p[j*nChannels + 2];
-			b_sum += b_pixel;
-			g_sum += g_pixel;
-			r_sum += r_pixel;
+			bgr<uchar> pixel =	{	mat_vec3b(i,j)[0],
+									mat_vec3b(i,j)[1],
+									mat_vec3b(i,j)[2] };
+			sum.b += pixel.b;
+			sum.g += pixel.g;
+			sum.r += pixel.r;
         }
     }
-	double b_mean = b_sum / nPixels;
-	double g_mean = g_sum / nPixels;
-	double r_mean = r_sum / nPixels;
+	bgr<double> mean = {	sum.b / nPixels,
+							sum.g / nPixels,
+							sum.r / nPixels };
 
 	// variance
-	double b_sum_sqrs = 0; // blue
-	double g_sum_sqrs = 0; // green
-	double r_sum_sqrs = 0; // red
+	bgr<double> sum_sqrs = bgr<double>();
     for(int i = 0; i < nRows; ++i) {
-        uchar *p = mat->ptr<uchar>(i);
         for(int j = 0; j < nCols; ++j) {
-            uchar b_pixel = p[j*nChannels + 0];
-            uchar g_pixel = p[j*nChannels + 1];
-            uchar r_pixel = p[j*nChannels + 2];
-			b_sum_sqrs += pow(b_pixel-b_mean, 2);
-			g_sum_sqrs += pow(g_pixel-g_mean, 2);
-			r_sum_sqrs += pow(r_pixel-r_mean, 2);
+			bgr<uchar> pixel =	{	mat_vec3b(i,j)[0],
+									mat_vec3b(i,j)[1],
+									mat_vec3b(i,j)[2] };
+			sum_sqrs.b += pow( pixel.b - mean.b, 2);
+			sum_sqrs.g += pow( pixel.g - mean.g, 2);
+			sum_sqrs.r += pow( pixel.r - mean.r, 2);
         }
     }
-	double b_var = b_sum_sqrs / nPixels;
-	double g_var = g_sum_sqrs / nPixels;
-	double r_var = r_sum_sqrs / nPixels;
+	bgr<double> var = {	sum_sqrs.b / nPixels,
+						sum_sqrs.g / nPixels,
+						sum_sqrs.r / nPixels };
 
-	return b_var + g_var + r_var;
+	return var.b + var.g + var.r;
 }
 
 
@@ -168,8 +234,11 @@ void process(PipelineBuffer *newBuff, PipelineBuffer *oldBuff, double *spatial_v
 		oldBuff->preprocessed = true;
 	}
 
+	saveAsFile("tmp_pre1", &newBuff->lpfImage); // TODO remove
+	saveAsFile("tmp_pre2", &oldBuff->lpfImage); // TODO remove
 	/* Take a difference of the lpf images to see changes.	*/
 	cv::absdiff(newBuff->lpfImage, oldBuff->lpfImage, image_diff);
+	saveAsFile("tmp_diff", &image_diff); // TODO remove
 
 	/* Calculate spatial variance (x, y) and pixel variance for the difference image.	*/
 	double spatial_var = calculateSpatialVariance(&image_diff);

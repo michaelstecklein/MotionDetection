@@ -3,6 +3,9 @@
 #include "PipelineBuffer.hpp"
 
 
+#define START_TAG	"<vars>"
+#define END_TAG		"</vars>"
+
 
 
 static void temp(void) {
@@ -46,12 +49,12 @@ static void temp(void) {
 }
 
 int main(int argc, char ** argv) {
-	//temp();
 	if (argc < 3) {
 		printf("Usage: ./printvariances <img1.jpg> <img2.jpg>\n");
 		exit(1);
 	}
 
+	// read in images
 	Mat img1 = cv::imread(argv[1], 1);
 	Mat img2 = cv::imread(argv[2], 1);
 	if(!img1.data || !img2.data) {
@@ -59,14 +62,16 @@ int main(int argc, char ** argv) {
 		exit(1);
 	}
 
+	// fill buffers with images
 	PipelineBuffer buff1(1);
 	PipelineBuffer buff2(2);
-
 	buff1.rawImage = img1;
 	buff2.rawImage = img2;
 
+	// run process
 	double spatial_var, pixel_var;
 	process(&buff1, &buff2, &spatial_var, &pixel_var);
 
-	printf("%f, %f\n", spatial_var, pixel_var);
+	// output variances
+	printf("%s%f,%f%s\n", START_TAG, spatial_var, pixel_var, END_TAG);
 }
