@@ -5,43 +5,12 @@
 #include "ThreadManager.hpp"
 #include "PipelineBuffer.hpp"
 #include "ImageSaver.hpp"
+#include "Process.hpp"
 
 
-#define PIXEL_VAR_COEFF		1
-#define SPATIAL_VAR_COEFF	1
-#define COST_THRESHHOLD		1
-#define LPF_DIVISOR			10 // length of squares to break raw image into during lpf
 
 
-static void saveAsFile(const char *fname, Mat *img) { // TODO remove
-	FILE *filp;
-	filp = fopen(fname,"w");
-
-    int nChannels = img->channels();
-    int nRows = img->rows;
-    int nCols = img->cols; // TODO account for channels
-	printf("%s r:%i c:%i chan:%i\n",fname,nRows,nCols,nChannels);
-	for (int i = 0; i < nRows; i++)
-		for (int j = 0; j < nCols; j++)
-			fprintf(filp, "%i\n", img->at<uchar>(i,j));
-
-	fprintf(filp, "-------\n");
-	fclose(filp);
-}
-
-#define BLUE	0
-#define GREEN	1
-#define RED		2
-template <typename T>
-class bgr {
-  public:
-	T b,g,r;
-	bgr (void) : bgr (0,0,0) {}
-	bgr (T _b, T _g, T _r) {
-		b = _b; g = _g; r = _r; }
-};
-
-static void preprocess_lpf(PipelineBuffer *buff) {
+void preprocess_lpf(PipelineBuffer *buff) {
     CV_Assert(buff->rawImage.depth() == CV_8U); // accept only char type matrices
     int nChannels = buff->rawImage.channels();
 	CV_Assert(nChannels == 3);
@@ -49,8 +18,6 @@ static void preprocess_lpf(PipelineBuffer *buff) {
     int nCols = buff->rawImage.cols;
 	int nPixels = nRows*nCols;
 	printf("%s r:%i c:%i chan:%i\n","preprocess_lpf",nRows,nCols,nChannels); // TODO remove
-	double aspectRatio = ((double)nCols) / nRows; // TODO remove
-	printf("aspectRation: %f\n",aspectRatio);
 
 	// construct lpf image
 	int lpfRows = nRows / LPF_DIVISOR;
@@ -70,7 +37,6 @@ static void preprocess_lpf(PipelineBuffer *buff) {
 					bgr<uchar> pixel = {	raw_vec3b(i,j)[BLUE],
 											raw_vec3b(i,j)[GREEN],
 											raw_vec3b(i,j)[RED]	};
-					printf("bgr: %i %i %i\n",pixel.b,pixel.g,pixel.r); // TODO remove
 					sum.b += pixel.b;
 					sum.g += pixel.g;
 					sum.r += pixel.r;
@@ -87,7 +53,7 @@ static void preprocess_lpf(PipelineBuffer *buff) {
     }
 }
 
-static double calculateSpatialVariance(Mat *mat) {
+double calculateSpatialVariance(Mat *mat) {
 	/* Weighted two-dimensional variance in x,y directions with pixel color
 	 * as weight. The variance is calculated around the "center of mass" of
 	 * the image.	var = x_var + y_var,  x_var,y_var = E[pixel*(x,y-mean)]	*/
@@ -99,8 +65,6 @@ static double calculateSpatialVariance(Mat *mat) {
 	int nPixels = nRows*nCols;
 	Mat_<Vec3b> mat_vec3b = *mat;
 	printf("%s r:%i c:%i chan:%i\n","calculateSpatialVariance",nRows,nCols,nChannels); // TODO remove
-	double aspectRatio = ((double)nCols) / nRows;
-	printf("aspectRation: %f\n",aspectRatio);
 
 	/* Center of Mass (mean)
 	 * x_com = (m1*x1+m2*x2+...) / (m1+m2+...)
@@ -165,7 +129,7 @@ static double calculateSpatialVariance(Mat *mat) {
 			weighted_var_x.r + weighted_var_y.r;
 }
 
-static double calculateVariance(Mat *mat) {
+double calculateVariance(Mat *mat) {
 	/* Calculates the variance of the parameter Mat's pixels  where: var = var_b + var_g + var_r
 	 * for channels blue(b), green(g), and red(r).	*/
     CV_Assert(mat->depth() == CV_8U); // accept only char type matrices
@@ -178,8 +142,6 @@ static double calculateVariance(Mat *mat) {
 	int nPixels = nRows*nCols;
 	Mat_<Vec3b> mat_vec3b = *mat;
 	printf("%s r:%i c:%i chan:%i\n","calculateVariance",nRows,nCols,nChannels); // TODO remove
-	double aspectRatio = ((double)nCols) / nRows;
-	printf("aspectRation: %f\n",aspectRatio);
 
 	// mean
 	bgr<double> sum = bgr<double>();
@@ -219,7 +181,7 @@ static double calculateVariance(Mat *mat) {
 
 Mat image_diff;
 
-void process(PipelineBuffer *newBuff, PipelineBuffer *oldBuff, double *spatial_var_out, double *pixel_var_out) {
+void process(PipelineBuffer *newBuff, PipelineBuffer *oldBuff, double *spatial_var_out, double *pixel_var_out, bool save_diff_img) {
 	printf("Processing %i   %i   and   %i   %i\n", newBuff->buffer_id, newBuff->image_id, oldBuff->buffer_id, oldBuff->image_id);
 
 	/* Calculate lpfImage, whose pixels are averages of square chunks of the original
@@ -234,11 +196,8 @@ void process(PipelineBuffer *newBuff, PipelineBuffer *oldBuff, double *spatial_v
 		oldBuff->preprocessed = true;
 	}
 
-	saveAsFile("tmp_pre1", &newBuff->lpfImage); // TODO remove
-	saveAsFile("tmp_pre2", &oldBuff->lpfImage); // TODO remove
 	/* Take a difference of the lpf images to see changes.	*/
 	cv::absdiff(newBuff->lpfImage, oldBuff->lpfImage, image_diff);
-	saveAsFile("tmp_diff", &image_diff); // TODO remove
 
 	/* Calculate spatial variance (x, y) and pixel variance for the difference image.	*/
 	double spatial_var = calculateSpatialVariance(&image_diff);
@@ -254,6 +213,8 @@ void process(PipelineBuffer *newBuff, PipelineBuffer *oldBuff, double *spatial_v
 	/* Set output parameters */
 	*spatial_var_out = spatial_var;
 	*pixel_var_out = pixel_var;
+	if (save_diff_img)
+		imwrite("diff_img.png", image_diff);
 
 
 #ifdef SAVE_ALL_IMAGES
@@ -265,5 +226,5 @@ void process(PipelineBuffer *newBuff, PipelineBuffer *oldBuff, double *spatial_v
 
 void process(PipelineBuffer *newBuff, PipelineBuffer *oldBuff) {
 	double tmp1, tmp2;
-	process(newBuff, oldBuff, &tmp1, &tmp2);
+	process(newBuff, oldBuff, &tmp1, &tmp2, false);
 }
