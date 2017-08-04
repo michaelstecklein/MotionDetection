@@ -1,0 +1,1 @@
+The algorithm will classify all difference images where 'x'% of the pixels are greater than a threshhold 'z', and images in this folder should fall under that category.

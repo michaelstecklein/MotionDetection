@@ -2,6 +2,7 @@
 #include "opencv2/opencv.hpp"
 #include "ThreadManager.hpp"
 #include "PipelineBuffer.hpp"
+#include "Process.hpp"
 
 
 #define START_TAG	"<vars>"
@@ -28,10 +29,19 @@ int main(int argc, char ** argv) {
 	PipelineBuffer buff2(2);
 	buff1.rawImage = img1;
 	buff2.rawImage = img2;
+	Mat diff_img;
 
-	// run process
-	double spatial_var, pixel_var;
-	process(&buff1, &buff2, &spatial_var, &pixel_var, true);
+	// run process functions
+	preprocess_lpf(&buff1);
+	preprocess_lpf(&buff2);
+	getDifferenceImage(&buff1.lpfImage, &buff2.lpfImage, &diff_img);
+	double spatial_var = calculateSpatialVariance(&diff_img);
+	double pixel_var = calculateVariance(&diff_img);
+
+	// save diff img w/ center of mass
+	imwrite("diff_img.jpg", diff_img);
+	getDifferenceImageWithCOM(&buff1.lpfImage, &buff2.lpfImage, &diff_img);
+	imwrite("diff_img_com.jpg", diff_img);
 
 	// output variances
 	printf("%s%f,%f%s\n", START_TAG, spatial_var, pixel_var, END_TAG);

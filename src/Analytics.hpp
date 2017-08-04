@@ -12,7 +12,7 @@ using namespace std;
 
 
 #ifdef ANALYTICS
-	#define ANALYTICS_NUM_ITERATIONS	200
+	#define ANALYTICS_NUM_ITERATIONS	100
 	#define SAVE_ALL_IMAGES	// save all images for debug/analysis purposes
 	void startCaptureAnalytics(void);
 	void endCaptureAnalytics(void);
