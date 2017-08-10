@@ -23,6 +23,15 @@ add_macro_analytics:
 .PHONY: add_macro_training
 training: add_macro_training $(TRAINING_EXE)
 
+
+.PHONY: raspberrypi
+raspberrypi: $(EXE)
+	$(eval CXXFLAGS += -D RASPBERRYPI)
+
+.PHONY: beagleboneblack
+beagleboneblack: $(EXE)
+	$(eval CXXFLAGS += -D BEAGLEBONEBLACK)
+
 add_macro_training:
 	$(eval CXXFLAGS += -D SAVE_ALL_IMAGES)
 
@@ -35,6 +44,7 @@ $(BLDDIR)/%.o: $(SRCDIR)/%.cpp $(DEPS)
 	$(CXX) -c $(CXXFLAGS) -o $@ $<
 
 $(DEPS):
+
 
 .PHONY: clean
 clean: 
