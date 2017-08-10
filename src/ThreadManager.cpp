@@ -17,17 +17,13 @@ static void captureHandle() {
 }
 
 void processHandle() {
-	PipelineBuffer *newBuff = NULL;
-	PipelineBuffer *oldBuff = NULL;
 	while (1) {
-		if (oldBuff == NULL) // first iteration only
-			oldBuff = pipelineManager.getPreProcessBuffer();
-		newBuff = pipelineManager.getPreProcessBuffer();
+		PipelineBuffer *newBuff = pipelineManager.getNewPreProcessBuffer();
+		PipelineBuffer *oldBuff = pipelineManager.getOldPreProcessBuffer();
 		startProcessAnalytics();
 		process(newBuff, oldBuff);
 		endProcessAnalytics();
 		pipelineManager.releaseProcess(oldBuff);
-		oldBuff = newBuff;
 	}
 }
 

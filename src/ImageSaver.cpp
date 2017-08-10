@@ -32,10 +32,10 @@ static string getDate(struct tm *time) {
 	return to_string(time->tm_year + 1900) + "-" + fmt2(time->tm_mon + 1) + "-" + fmt2(time->tm_mday);
 }
 
-static string getNameRoot(PipelineBuffer& buff) { // YYYY-MM-DD_HH-MM-SS_tag
+static string getNameRoot(PipelineBuffer& buff) { // YYYY/MM/DD__HH:MM:SS__tag
 	struct tm *time = localtime(&buff.timestamp);
 	int tag = buff.image_id % 1000;
-	return getDate(time) + "_" + getTime(time) + "_" + to_string(tag);
+	return getDate(time) + "__" + getTime(time) + "__" + to_string(tag);
 }
 
 static void saveImg(string path, string name, Mat& img) {

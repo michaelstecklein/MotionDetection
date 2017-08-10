@@ -17,7 +17,7 @@
 #ifndef __pipelinemanagager_hpp_
 #define __pipelinemanagager_hpp_
 
-#include <queue>
+#include <deque>
 #include "PipelineBuffer.hpp"
 using namespace std;
 
@@ -32,7 +32,8 @@ class PipelineManager {
 		/*	Return a buffer that is in the respective place in the
 			pipeline. Will hang while no buffer is available. */
 		PipelineBuffer *getEmptyBuffer(void);
-		PipelineBuffer *getPreProcessBuffer(void);
+		PipelineBuffer *getNewPreProcessBuffer(void); // should call new before old
+		PipelineBuffer *getOldPreProcessBuffer(void);
 		PipelineBuffer *getPostProcessBuffer(void);
 
 		/*	Called by given pipeline stage after the stage
@@ -43,12 +44,13 @@ class PipelineManager {
 		void releaseDispose(PipelineBuffer *buff);
 
 	private:
-		queue<PipelineBuffer*> emptyQ;
+		deque<PipelineBuffer*> emptyQ;
 		mutex emptyQ_mtx;
-		queue<PipelineBuffer*> preprocessQ;
+		deque<PipelineBuffer*> preprocessQ;
 		mutex preprocessQ_mtx;
-		queue<PipelineBuffer*> postprocessQ;
+		deque<PipelineBuffer*> postprocessQ;
 		mutex postprocessQ_mtx;
+		void checkPreProcessLength(void);
 };
 
 
