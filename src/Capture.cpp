@@ -10,7 +10,6 @@ VideoCapture cap(0); // open the default camera
 
 
 void capture(PipelineBuffer *buff) {
-	printf("Capturing %i   %i\n", buff->buffer_id, buff->image_id);
 	if (!cap.isOpened()) {
 		printf("ERROR: VideoCapture is not opened\n");
 		exit(-1);

@@ -5,12 +5,14 @@
 
 
 void dispose(PipelineBuffer *buff) {
-	printf("Disposing %i   %i     %i\n", buff->buffer_id, buff->image_id,buff->save_image);
 
 #ifndef SAVE_ALL_IMAGES
 	if (buff->save_image)
 #endif /* SAVE_ALL_IMAGES */
 	saveRawImage(*buff);
+
+	if (buff->save_image) // TODO remove
+		printf("MOTION DETECTED %i\n", buff->image_id);
 	
 	buff->preprocessed = false;
 	buff->image_id = -1;

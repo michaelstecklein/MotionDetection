@@ -17,14 +17,25 @@
 #define OLD_TAG		"_old"
 
 
-static string getNameRoot(PipelineBuffer& buff) { // MM-DD-YYYY_HH-MM-SS_tag
-	struct tm *time = gmtime(&buff.timestamp);
+static string fmt2(int i) {
+	string str = to_string(i);
+	if (i > 9) // not single digit
+		return str;
+	return "0" + str;
+}
+
+static string getTime(struct tm *time) {
+	return fmt2(time->tm_hour) + ":" + fmt2(time->tm_min) + ":" + fmt2(time->tm_sec);
+}
+
+static string getDate(struct tm *time) {
+	return to_string(time->tm_year + 1900) + "-" + fmt2(time->tm_mon + 1) + "-" + fmt2(time->tm_mday);
+}
+
+static string getNameRoot(PipelineBuffer& buff) { // YYYY-MM-DD_HH-MM-SS_tag
+	struct tm *time = localtime(&buff.timestamp);
 	int tag = buff.image_id % 1000;
-	stringstream ss;
-	ss <<	time->tm_mon << "-" << time->tm_mday << "-" << time->tm_year << \
-			"_" << time->tm_hour << "-" << time->tm_min << "-" << time->tm_sec << \
-			"_" << tag;
-	return ss.str();
+	return getDate(time) + "_" + getTime(time) + "_" + to_string(tag);
 }
 
 static void saveImg(string path, string name, Mat& img) {

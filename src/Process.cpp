@@ -134,15 +134,12 @@ double calculateSpatialVariance(Mat *mat) {
 			pixel_sum.r += pixel.r;
         }
     }
-	printf("pixel sums: b:%f g:%f r:%f\n",pixel_sum.b,pixel_sum.g,pixel_sum.r); // TODO remove line
-	printf("com: x: b:%f g:%f r:%f  y: b:%f g:%f r:%f\n",x_com.b,x_com.g,x_com.r,y_com.b,y_com.g,y_com.r); // TODO remove line
 	bgr<double> var_x = {	sum_sqr_x.b / pixel_sum.b,
 									sum_sqr_x.g / pixel_sum.g,
 									sum_sqr_x.r / pixel_sum.r	};
 	bgr<double> var_y = {	sum_sqr_y.b / pixel_sum.b,
 									sum_sqr_y.g / pixel_sum.g,
 									sum_sqr_y.r / pixel_sum.r	};
-	printf("spat var: x: b:%f g:%f r:%f  y: b:%f g:%f r:%f\n",var_x.b,var_x.g,var_x.r,var_y.b,var_y.g,var_y.r); // TODO remove line
 
 	double weighted_var_x = ( var_x.b*pixel_sum.b + var_x.g*pixel_sum.g + var_x.r*pixel_sum.r ) \
 										 / ( pixel_sum.b + pixel_sum.g + pixel_sum.r );
@@ -157,7 +154,6 @@ double calculateVariance(Mat *mat) {
     CV_Assert(mat->depth() == CV_8U); // accept only char type matrices
     int nChannels = mat->channels();
 	CV_Assert(nChannels == 3);
-	printf("nChannels=%i\n",nChannels);
 	CV_Assert(nChannels==3);
     int nRows = mat->rows;
     int nCols = mat->cols;
@@ -257,8 +253,6 @@ void process(PipelineBuffer *newBuff, PipelineBuffer *oldBuff) {
 	double pixel_var = calculateVariance(&image_diff);
 
 	/* Threshhold the cost to decide if motion occurred, and set save_image flag if so.	*/
-	printf("vars      :\t%f\t%f\n",pixel_var,spatial_var);
-	printf("thresholds:\t%f\t%f\n",PIXEL_VAR_THRESHOLD,SPATIAL_VAR_THRESHOLD);
 	if (pixel_var >= PIXEL_VAR_THRESHOLD && spatial_var >= SPATIAL_VAR_THRESHOLD)
 		// both must meet thresholds, then motion
 		oldBuff->save_image = true;

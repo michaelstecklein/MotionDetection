@@ -21,7 +21,7 @@
 #include "PipelineBuffer.hpp"
 using namespace std;
 
-#define NUM_BUFFERS		2
+#define NUM_BUFFERS		10
 
 
 class PipelineManager {
