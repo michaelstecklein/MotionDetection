@@ -253,7 +253,7 @@ void process(PipelineBuffer *newBuff, PipelineBuffer *oldBuff) {
 	double pixel_var = calculateVariance(&image_diff);
 
 	/* Threshhold the cost to decide if motion occurred, and set save_image flag if so.	*/
-	if (pixel_var >= PIXEL_VAR_THRESHOLD && spatial_var >= SPATIAL_VAR_THRESHOLD)
+	if (pixel_var >= PIXEL_VAR_THRESHOLD && spatial_var <= SPATIAL_VAR_THRESHOLD)
 		// both must meet thresholds, then motion
 		oldBuff->save_image = true;
 	else
