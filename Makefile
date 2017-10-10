@@ -23,17 +23,22 @@ add_macro_analytics:
 .PHONY: add_macro_training
 training: add_macro_training $(TRAINING_EXE)
 
-
-.PHONY: raspberrypi
-raspberrypi: $(EXE)
-	$(eval CXXFLAGS += -D RASPBERRYPI)
-
-.PHONY: beagleboneblack
-beagleboneblack: $(EXE)
-	$(eval CXXFLAGS += -D BEAGLEBONEBLACK)
-
 add_macro_training:
 	$(eval CXXFLAGS += -D SAVE_ALL_IMAGES)
+
+
+.PHONY: raspberrypi
+raspberrypi: add_macro_raspberrypi $(EXE)
+
+add_macro_raspberrypi:
+	$(eval CXXFLAGS += -D RASPBERRYPI)
+
+
+.PHONY: beagleboneblack
+beagleboneblack: add_macro_beagleboneblack $(EXE)
+
+add_macro_beagleboneblack:
+	$(eval CXXFLAGS += -D BEAGLEBONEBLACK)
 
 
 $(EXE) $(ANALYTICS_EXE) $(TRAINING_EXE): $(OBJS)
