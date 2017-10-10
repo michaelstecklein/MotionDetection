@@ -1,5 +1,3 @@
-#include <thread>
-#include <unistd.h>
 #include <stdlib.h>
 #include "Plugins.hpp"
 
@@ -18,7 +16,6 @@
 
 void turn_on_led(void) {
 	#ifdef RASPBERRYPI
-		system("sudo echo none | sudo dd of=/sys/class/leds/led0/trigger");
 		system("sudo echo 1 | sudo dd of=/sys/class/leds/led0/brightness");
 	#endif
 	#ifdef BEAGLEBONEBLACK
@@ -28,7 +25,6 @@ void turn_on_led(void) {
 
 void turn_off_led(void) {
 	#ifdef RASPBERRYPI
-		system("sudo echo none | sudo dd of=/sys/class/leds/led0/trigger");
 		system("sudo echo 0 | sudo dd of=/sys/class/leds/led0/brightness");
 	#endif
 	#ifdef BEAGLEBONEBLACK
@@ -36,32 +32,23 @@ void turn_off_led(void) {
 	#endif
 }
 
-static bool delay_task_running = false;
-static bool reset_delay = false;
-
-static void delay_task(void) {
-	delay_task_running = true;
-	reset_delay = false;
-	do {
-		usleep(500000); // 1/2 second
-	} while (!reset_delay)
-	delay_task_running = false;
-	turn_off_led();
+static void init_led(void) {
+	#ifdef RASPBERRYPI
+		system("sudo echo none | sudo dd of=/sys/class/leds/led0/trigger");
+	#endif
+	#ifdef BEAGLEBONEBLACK
+		// TODO
+	#endif
 }
 
-thread delay_thread;
-
-static void start_delay_task(void) {
-	if (!delay_task_running) {
-		delay_thread(delay_task);
-	} else {
-		reset_delay = true;
-	}	
-}
+static bool led_on = false;
 
 static void toggle_led(void) {
-	turn_on_led();
-	start_delay_task();
+	if (led_on)
+		turn_off_led();
+	else
+		turn_on_led();
+	led_on = !led_on;
 }
 
 #endif /* TOGGLE_LED */
