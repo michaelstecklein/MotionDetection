@@ -6,7 +6,7 @@
 #define PIXEL_VAR_THRESHOLD			25.0
 #define SPATIAL_VAR_THRESHOLD		425.0
 #define CHANGE_THRESHOLD			10
-#define PERCENT_CHANGE_THRESHOLD	10
+#define PERCENT_CHANGE_THRESHOLD	75
 
 
 #define LPF_DIVISOR				10 // length of squares to break raw image into during lpf
