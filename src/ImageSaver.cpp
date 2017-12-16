@@ -3,6 +3,8 @@
 #include <string>
 #include <sstream>
 #include <time.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include "opencv2/opencv.hpp"
 #include "ImageSaver.hpp"
 #include "PipelineBuffer.hpp"
@@ -38,8 +40,17 @@ static string getNameRoot(PipelineBuffer& buff) { // YYYY/MM/DD__HH:MM:SS__tag
 	return getDate(time) + "__" + getTime(time) + "__" + to_string(tag);
 }
 
+static void force_writeback(string file) {
+	int fd = open(file.c_str(),O_WRONLY);
+	fsync(fd);
+	close(fd);
+}
+
 static void saveImg(string path, string name, Mat& img) {
-	imwrite(path + "/" + name + IMG_EXT, img );
+	string file = path + "/" + name + IMG_EXT;
+	imwrite(file, img );
+	force_writeback(path);
+	force_writeback(file);
 }
 
 static void dir(string path) {
